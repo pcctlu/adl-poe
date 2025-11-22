@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title></title>
+</head>
+<body>
+	<pre>
+
+
+
+
+import tensorflow as tf
+from tensorflow.keras import layers, models
+from tensorflow.keras.datasets import cifar10
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+(x_train, y_train), (x_test, y_test) = cifar10.load_data()
+
+
+class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
+               'dog', 'frog', 'horse', 'ship', 'truck']
+
+
+# Normalize images
+x_train = x_train.astype("float32") / 255.0
+x_test = x_test.astype("float32") / 255.0
+
+
+# Split Labeled / Unlabeled
+num_labeled = 20000
+idx = np.arange(len(x_train))
+np.random.shuffle(idx)
+
+
+x_train = x_train[idx]
+y_train = y_train[idx]
+
+x_labeled = x_train[:num_labeled]
+y_labeled = y_train[:num_labeled]
+
+x_unlabeled = x_train[num_labeled:]
+y_unlabeled = y_train[num_labeled:]
+
+
+# Build CNN Model Function
+def build_model():
+    model = models.Sequential([
+        layers.Conv2D(32, 3, activation='relu', padding='same', input_shape=(32,32,3)),
+        layers.MaxPooling2D(),
+        layers.Conv2D(64, 3, activation='relu', padding='same'),
+        layers.MaxPooling2D(),
+        layers.Flatten(),
+        layers.Dense(128, activation='relu'),
+        layers.Dense(10, activation='softmax')
+    ])
+    model.compile(optimizer='adam',
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
+    return model
+
+model = build_model()
+
+
+print("Training on labeled data only")
+history_labeled = model.fit(
+    x_labeled, y_labeled,
+    epochs=10, batch_size=64,
+    validation_data=(x_test, y_test),
+    verbose=1
+)
+
+
+test_loss, test_acc_labeled = model.evaluate(x_test, y_test, verbose=0)
+print("Accuracy using labeled data only:", test_acc_labeled)
+
+
+print("\nGenerating pseudo-labels...")
+probs = model.predict(x_unlabeled)
+pseudo_labels = np.argmax(probs, axis=1)
+confidence = np.max(probs, axis=1)
+
+
+# Keep high-confidence pseudo labels
+mask = confidence > 0.90
+x_pseudo = x_unlabeled[mask]
+y_pseudo = pseudo_labels[mask]
+
+print("Pseudo-labeled samples selected:", len(y_pseudo))
+
+
+# 3. Combine Labeled + Pseudo-labeled
+x_combined = np.concatenate([x_labeled, x_pseudo])
+y_combined = np.concatenate([y_labeled.flatten(), y_pseudo])
+
+print("Total training samples after combining:", len(x_combined))
+
+
+# 4. Retrain Model with Combined Data
+history_pseudo = model.fit(
+    x_combined, y_combined,
+    epochs=10, batch_size=64,
+    validation_data=(x_test, y_test),
+    verbose=1
+)
+
+
+test_loss, test_acc_pseudo = model.evaluate(x_test, y_test, verbose=0)
+
+print("\nAccuracy after labeled-only training:", test_acc_labeled)
+print("Accuracy after pseudo-label training:", test_acc_pseudo)
+print("Improvement:", test_acc_pseudo - test_acc_labeled)
+
+
+# ---- Show Labeled Samples ----
+plt.figure(figsize=(10,10))
+for i in range(25):
+    plt.subplot(5, 5, i+1)
+    plt.xticks([]); plt.yticks([]); plt.grid(False)
+    plt.imshow(x_labeled[i])
+    plt.title(class_names[y_labeled[i][0]])
+plt.suptitle("Labeled Images")
+plt.show()
+
+# ---- Show Unlabeled Samples ----
+plt.figure(figsize=(10,10))
+for i in range(25):
+    plt.subplot(5, 5, i+1)
+    plt.xticks([]); plt.yticks([]); plt.grid(False)
+    plt.imshow(x_unlabeled[i])
+    plt.title("Unlabeled")
+plt.suptitle("Unlabeled Images")
+plt.show()
+
+# ---- Show Pseudo-Labeled Samples ----
+plt.figure(figsize=(10,10))
+for i in range(25):
+    plt.subplot(5, 5, i+1)
+    plt.xticks([]); plt.yticks([]); plt.grid(False)
+    plt.imshow(x_pseudo[i])
+    plt.title(class_names[y_pseudo[i]])
+plt.suptitle("Pseudo-Labeled Images (High Confidence)")
+plt.show()
+
+
+
+
+
+
+
+	</pre>
+
+</body>
+</html>

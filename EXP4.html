@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title></title>
+</head>
+<body>
+	<pre>
+
+
+!pip install ultralytics
+
+import cv2
+from ultralytics import YOLO
+
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+
+
+model = YOLO("yolov8s.pt")
+
+
+image_path = "/content/dog_bike_car.webp"
+img = cv2.imread(image_path)
+
+
+image_test = mpimg.imread(image_path)
+plt.imshow(image_test)
+
+results = model.predict(source=img, save=True, show=True)
+
+
+for r in results:
+    scores = r.boxes.conf  # Confidence scores
+    classes = r.boxes.cls  # Class IDs
+    names = model.names # Class names mapping
+
+    for i in range(len(scores)):
+
+        confidence = scores[i]
+        class_id = int(classes[i])
+        class_name = names[class_id]
+
+        print(f"Detected: {class_name} with confidence {confidence:.2f}")
+
+image = mpimg.imread("runs/detect/predict/image0.jpg")
+plt.imshow(image)
+
+
+
+
+
+	</pre>
+
+</body>
+</html>
